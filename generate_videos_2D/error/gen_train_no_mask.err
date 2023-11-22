@@ -1,0 +1,28 @@
+
+CommandNotFoundError: Your shell has not been properly configured to use 'conda deactivate'.
+To initialize your shell, run
+
+    $ conda init <SHELL_NAME>
+
+Currently supported shells are:
+  - bash
+  - fish
+  - tcsh
+  - xonsh
+  - zsh
+  - powershell
+
+See 'conda init --help' for more information and options.
+
+IMPORTANT: You may need to close and restart your shell after running 'conda init'.
+
+
+Traceback (most recent call last):
+  File "/home/asravan2/pose_estimation/2D-fish-pose/src_pose_2D_single_model/python_scripts/generate_training_data/runme_generate_training_data_with_mask.py", line 66, in <module>
+  File "/opt/miniconda3/envs/opence-v1.5.1/lib/python3.9/site-packages/torch/serialization.py", line 376, in save
+    with _open_file_like(f, 'wb') as opened_file:
+  File "/opt/miniconda3/envs/opence-v1.5.1/lib/python3.9/site-packages/torch/serialization.py", line 230, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "/opt/miniconda3/envs/opence-v1.5.1/lib/python3.9/site-packages/torch/serialization.py", line 211, in __init__
+    super(_open_file, self).__init__(open(name, mode))
+OSError: [Errno 122] Disk quota exceeded: '../../../training_data_2D_230511/coor_2d/ann_342953.pt'
