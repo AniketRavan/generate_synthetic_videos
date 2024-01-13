@@ -322,7 +322,6 @@ def f_x_to_model(x, seglen, randomize):
     theta = np.zeros((9, 1))
     theta[0] = dt[0]
     pt[:, 0] = hp
-
     for n in range(0, 9):
         R = np.array([[np.cos(dt[n]), -np.sin(dt[n])], [np.sin(dt[n]), np.cos(dt[n])]])
         if n == 0:
@@ -368,7 +367,6 @@ def f_x_to_model(x, seglen, randomize):
         dt2 = pt[1, n] - coor_t2
         tailpix = imblank
         tail_model = gen_lut_b_tail(ni, seglen, dt1, dt2, theta[n], randomize)
-
         tailpix[int(np.maximum(0, coor_t2 - (size_half - 1))) : int(np.minimum(imageSizeY, 1 + coor_t2 + (size_half - 1))),
                 int(np.maximum(0, coor_t1 - (size_half - 1))) : int(np.minimum(imageSizeX, 1 + coor_t1 + (size_half - 1)))] = tail_model[int(np.maximum((size_half - 1) - coor_t2, 0)) : int(np.minimum(imageSizeY - coor_t2 + size_half - 1, size_lut)),
                     int(np.maximum((size_half - 1) - coor_t1, 0)) : int(np.minimum(imageSizeX - coor_t1 + size_half - 1, size_lut))]
