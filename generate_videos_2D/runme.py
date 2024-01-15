@@ -44,18 +44,20 @@ imageSizeY = 640
 bufferX = 30
 bufferY = 30
 ############################################################
-for mat_file_idx in (range(0, 600)):
+for mat_file_idx in tqdm(range(0, 600)):
     # Load the array of pose angles : generated_pose_all_2D_50k
     # The angles are sampled from a probability distribution learnt from the  distribution of real poses (see manuscript)
     filepath = os.path.join(trajectory_folder, str(mat_file_idx).rjust(3, '0') + '.mat')
     x_vid = sio.loadmat(filepath)
     x_vid = x_vid['x_vid']
     data_folder = os.path.join(data_folder_parent, str(mat_file_idx).rjust(3, '0'))
-    print(mat_file_idx)
-    if not os.path.exists(data_folder) or not os.path.exists(data_folder + '/images'):
-        os.makedirs(data_folder, exist_ok = True)
-        os.makedirs(data_folder + '/images')
-        os.makedirs(data_folder + '/coor_2d')
+    image_folder = os.path.join(data_folder_parent, 'images', str(mat_file_idx).rjust(3, '0'))
+    annotations_folder = os.path.join(data_folder_parent, 'annotations', str(mat_file_idx).rjust(3, '0'))
+    #print(mat_file_idx)
+    if not os.path.exists(data_folder_parent) or not os.path.exists(image_folder) or not os.path.exists(annotations_folder):
+        os.makedirs(image_folder, exist_ok=True)
+        os.makedirs(annotations_folder + '/coor_2d')
+        os.makedirs(annotations_folder + '/bbox')
     else:
         print('Warning: data_folder already exists. Files might be overwritten')
 
@@ -89,6 +91,15 @@ for mat_file_idx in (range(0, 600)):
         seglen = 5.6 + idxlen * 0.1
         # Render physical model image and the corresponding annotation
         graymodel, pt = f_x_to_model(x.T, seglen, randomize)
+        y, x = np.argwhere(graymodel > 0)[0]
+        y = np.maximum(0, y - np.random.randint(0, 5))
+        x = np.maximum(0, x - np.random.randint(0, 5))
+        y_max, x_max = np.argwhere(graymodel > 0)[-1]
+        y_max = np.minimum(graymodel.shape[1], y_max + np.random.randint(0, 5))
+        x_max = np.minimum(graymodel.shape[0], x_max + np.random.randint(0, 5))
+        width = x_max - x
+        height = y_max - y
+        bbox = torch.tensor([x, y, width, height])
         graymodel = np.uint8(255 * (graymodel / np.max(graymodel)))
         if render_spots:
             #for i in range(0,4):
@@ -113,8 +124,9 @@ for mat_file_idx in (range(0, 600)):
 
 
         # Save rendered image and annotation
-        #cv2.imwrite(data_folder + '/images/im_' + str(frame).rjust(6, "0") + '.png', np.uint8(graymodel))
-        #torch.save(pt, data_folder + '/coor_2d/ann_' + str(frame).rjust(6, "0") + '.pt')
+        cv2.imwrite(image_folder + '/im_' + str(frame).rjust(6, "0") + '.png', np.uint8(graymodel))
+        torch.save(bbox, annotations_folder + '/bbox/bbox_' + str(frame).rjust(6, "0") + '.pt')
+        #torch.save(pt, annotations_folder + '/coor_2d/ann_' + str(frame).rjust(6, "0") + '.pt')
     writer.close()
 
 print('Finished generating data')
