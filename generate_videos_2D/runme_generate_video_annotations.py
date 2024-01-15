@@ -27,7 +27,7 @@ for vid_idx in tqdm(range(num_videos)):
     frames = os.listdir(os.path.join(vid_rootpath, 'images', vid_files[vid_idx]))
     num_frames = len(frames)
     for frame_idx in range(len(frames)):
-        filenames.append(os.path.join(vid_rootpath, 'images', vid_files[vid_idx], frames[frame_idx]))
+        filenames.append(os.path.join(vid_files[vid_idx], frames[frame_idx]))
 
     videos_key = {'license':'', 'coco_url': '', 'height': height, 'width': width, 'length': num_frames,\
             'date_captured': '0000-00-00 00:00:00.903902', 'file_names': filenames, 'flickr_url': '', 'id': vid_idx + 1}
