@@ -200,7 +200,7 @@ class YTVISDatasetMapper:
             if self.sampling_frame_shuffle:
                 random.shuffle(selected_idx)
         else:
-            selected_idx = range(video_length)
+            selected_idx = range(4)#video_length)
 
         video_annos = dataset_dict.pop("annotations", None)
         file_names = dataset_dict.pop("file_names", None)

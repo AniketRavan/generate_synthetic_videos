@@ -10,6 +10,7 @@ import os
 import pycocotools.mask as mask_util
 from fvcore.common.file_io import PathManager
 from fvcore.common.timer import Timer
+import pdb
 
 from detectron2.structures import Boxes, BoxMode, PolygonMasks
 from detectron2.data import DatasetCatalog, MetadataCatalog
@@ -111,7 +112,7 @@ YTVIS_CATEGORIES_2021 = [
     {"color": [199, 100, 0], "isthing": 1, "id": 40, "name": "zebra"},
 ]
 
-def _get_ytvis_2019_instances_meta():
+def _get_danio2d_instances_meta():
     return {}
 
 def _get_ytvis_2019_instances_meta():
@@ -230,7 +231,6 @@ Category ids in annotations are not in [1, #categories]! We'll apply a mapping f
 
                 _bboxes = anno.get("bboxes", None)
                 _segm = anno.get("segmentations", None)
-
                 if not (_bboxes and _segm and _bboxes[frame_idx] and _segm[frame_idx]):
                     continue
 
@@ -245,7 +245,7 @@ Category ids in annotations are not in [1, #categories]! We'll apply a mapping f
                         # convert to compressed RLE
                         segm = mask_util.frPyObjects(segm, *segm["size"])
                 elif segm:
-                    # filter out invalid polygons (< 3 points)
+                    #filter out invalid polygons (< 3 points)
                     segm = [poly for poly in segm if len(poly) % 2 == 0 and len(poly) >= 6]
                     if len(segm) == 0:
                         num_instances_without_valid_segmentation += 1
@@ -307,14 +307,14 @@ if __name__ == "__main__":
 
     logger = setup_logger(name=__name__)
     #assert sys.argv[3] in DatasetCatalog.list()
-    meta = MetadataCatalog.get("ytvis_2019_train")
+    meta = MetadataCatalog.get("danio2d_train")
 
-    json_file = "./datasets/ytvis/instances_train_sub.json"
-    image_root = "./datasets/ytvis/train/JPEGImages"
-    dicts = load_ytvis_json(json_file, image_root, dataset_name="ytvis_2019_train")
+    json_file = "./datasets/danio2d_small/train.json"
+    image_root = "./datasets/danio2d_small/train/images"
+    dicts = load_ytvis_json(json_file, image_root, dataset_name="danio2d_train")
     logger.info("Done loading {} samples.".format(len(dicts)))
 
-    dirname = "ytvis-data-vis"
+    dirname = "danio2d_small"
     os.makedirs(dirname, exist_ok=True)
 
     def extract_frame_dic(dic, frame_idx):
@@ -330,7 +330,7 @@ if __name__ == "__main__":
         vid_name = d["file_names"][0].split('/')[-2]
         os.makedirs(os.path.join(dirname, vid_name), exist_ok=True)
         for idx, file_name in enumerate(d["file_names"]):
-            img = np.array(Image.open(file_name))
+            img = np.array(Image.open(file_name).convert('RGB'))
             visualizer = Visualizer(img, metadata=meta)
             vis = visualizer.draw_dataset_dict(extract_frame_dic(d, idx))
             fpath = os.path.join(dirname, vid_name, file_name.split('/')[-1])

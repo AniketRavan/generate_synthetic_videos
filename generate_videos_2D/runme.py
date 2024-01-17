@@ -13,6 +13,7 @@ import os
 import scipy.io as sio
 import pdb
 import cv2
+import pickle
 import torch
 import argparse
 from tqdm import tqdm
@@ -20,7 +21,9 @@ import os
 import imageio
 from tqdm import tqdm
 from scipy.spatial.transform import Rotation as R
-
+from pycocotools import mask as maskUtils
+from itertools import groupby
+import pdb
 parser = argparse.ArgumentParser()
 parser.add_argument('-d','--data_folder', default="training_dataset", type=str, help='path to store training dataset')
 parser.add_argument('-n','--n_frames',default=500000, type=int, help='number of training examples')
@@ -33,6 +36,27 @@ data_folder_parent = args['data_folder']
 n_frames = args['n_frames']
 add_Gaussian_noise = args['add_Gaussian_noise']
 trajectory_folder = args['trajectory_folder']
+
+def binary_image_to_coco_annotations(binary_image):
+    # Find contours in the binary image
+    # binary image shape: [h, w, n], where n is the number of fishes
+    if len(binary_image.shape)==2:
+        binary_image = np.expand_dims(binary_image, axis=-1) 
+    segmentations = maskUtils.encode(np.asfortranarray(binary_image))
+    areas = maskUtils.area(segmentations)
+    #contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    #segmentations = []
+    #areas = []
+    #pdb.set_trace()
+    #for contour in contours:
+    #    areas.append(int(cv2.contourArea(contour)))
+    #    # Flatten the contour coordinates into a 1D array
+    #    contour = contour.flatten().tolist()
+        # Convert the 1D array to a list of (x, y) pairs
+    #    contour_pairs = [(contour[i], contour[i+1]) for i in range(0, len(contour), 2)]
+        # Convert the (x, y) pairs to a list of integers
+    #    segmentations.append([int(coord) for pair in contour_pairs for coord in pair])
+    return segmentations, areas
 
 ############################################################
 random.seed(10)
@@ -58,6 +82,7 @@ for mat_file_idx in tqdm(range(0, 600)):
         os.makedirs(image_folder, exist_ok=True)
         os.makedirs(annotations_folder + '/coor_2d')
         os.makedirs(annotations_folder + '/bbox')
+        os.makedirs(annotations_folder + '/segmentations')
     else:
         print('Warning: data_folder already exists. Files might be overwritten')
 
@@ -101,6 +126,13 @@ for mat_file_idx in tqdm(range(0, 600)):
         height = y_max - y
         bbox = torch.tensor([x, y, width, height])
         graymodel = np.uint8(255 * (graymodel / np.max(graymodel)))
+
+        _, thresholded_image = cv2.threshold(graymodel, 0, 255, cv2.THRESH_BINARY)
+        segmentations, areas = binary_image_to_coco_annotations(thresholded_image)
+        
+        segmentation_annotation = []
+        for segmentation, area in zip(segmentations, areas):
+            segmentation_annotation.append({'segmentations': segmentation, 'area': area})
         if render_spots:
             #for i in range(0,4):
             for ellipse_idx in range(0, np.random.randint(4)):
@@ -126,6 +158,8 @@ for mat_file_idx in tqdm(range(0, 600)):
         # Save rendered image and annotation
         cv2.imwrite(image_folder + '/im_' + str(frame).rjust(6, "0") + '.png', np.uint8(graymodel))
         torch.save(bbox, annotations_folder + '/bbox/bbox_' + str(frame).rjust(6, "0") + '.pt')
+        with open(annotations_folder + '/segmentations/segmentation_' + str(frame).rjust(6, "0"), "wb") as fp:   #Pickling
+            pickle.dump(segmentation_annotation, fp)
         #torch.save(pt, annotations_folder + '/coor_2d/ann_' + str(frame).rjust(6, "0") + '.pt')
     writer.close()
 

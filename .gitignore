@@ -2,3 +2,5 @@ local-linear-segmentation/.git/
 generate_videos_2D/generated_videos
 generate_videos_2D/danio2d
 generate_videos_2D/danio2d_small
+generate_videos_2D/Mask2Former/datasets/danio2d_small
+generate_videos_2D/Mask2Former/danio2d_small

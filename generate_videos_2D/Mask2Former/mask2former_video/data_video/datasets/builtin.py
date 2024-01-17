@@ -11,12 +11,12 @@ from .ytvis import (
 )
 
 _PREDEFINED_SPLITS_DANIO2D = {
-    "danio2d_train": ("danio2d/train/JPEGImages",
-                         "danio2d/train.json"),
-    "danio2d_val": ("danio2d/valid/JPEGImages",
-                       "danio2d/valid.json"),
-    "danio2d_test": ("danio2d/test/JPEGImages",
-                        "danio2d/test.json"),
+    "danio2d_train": ("danio2d_small/train/images",
+                         "danio2d_small/train.json"),
+    "danio2d_val": ("danio2d_small/val/images",
+                       "danio2d_small/val.json"),
+    "danio2d_test": ("danio2d_small/test/images",
+                        "danio2d_small/test.json"),
 }
 
 # ==== Predefined splits for YTVIS 2019 ===========

@@ -12,5 +12,5 @@
 echo Running
 module load opence/1.5.1
 echo Module loaded
-python runme.py -n 500000  -d 'generated_videos' -t 'x_files_4_dim_rotated'
+python runme.py -n 500000  -d 'danio2d' -t 'x_files_4_dim_rotated'
 echo Done

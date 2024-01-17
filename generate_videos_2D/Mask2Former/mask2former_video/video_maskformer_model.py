@@ -17,7 +17,7 @@ from detectron2.structures import Boxes, ImageList, Instances, BitMasks
 from .modeling.criterion import VideoSetCriterion
 from .modeling.matcher import VideoHungarianMatcher
 from .utils.memory import retry_if_cuda_oom
-
+import pdb
 logger = logging.getLogger(__name__)
 
 
@@ -183,7 +183,6 @@ class VideoMaskFormer(nn.Module):
                 images.append(frame.to(self.device))
         images = [(x - self.pixel_mean) / self.pixel_std for x in images]
         images = ImageList.from_tensors(images, self.size_divisibility)
-
         features = self.backbone(images.tensor)
         outputs = self.sem_seg_head(features)
 
