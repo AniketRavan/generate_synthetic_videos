@@ -148,7 +148,7 @@ for mat_file_idx in tqdm(range(0, 600)):
         if add_Gaussian_noise:
             graymodel = add_noise('gauss', graymodel, 0.001 * 100 * random.rand(1), 0.002 * 5 * random.rand(1))
         graymodel = np.uint8(graymodel)
-        pt = tensor = torch.tensor(pt, dtype=torch.float32)
+        pt = torch.tensor(pt, dtype=torch.float32)
         
         
         # Append frame to video file
@@ -160,7 +160,7 @@ for mat_file_idx in tqdm(range(0, 600)):
         torch.save(bbox, annotations_folder + '/bbox/bbox_' + str(frame).rjust(6, "0") + '.pt')
         with open(annotations_folder + '/segmentations/segmentation_' + str(frame).rjust(6, "0"), "wb") as fp:   #Pickling
             pickle.dump(segmentation_annotation, fp)
-        #torch.save(pt, annotations_folder + '/coor_2d/ann_' + str(frame).rjust(6, "0") + '.pt')
+        torch.save(pt, annotations_folder + '/coor_2d/ann_' + str(frame).rjust(6, "0") + '.pt')
     writer.close()
 
 print('Finished generating data')
