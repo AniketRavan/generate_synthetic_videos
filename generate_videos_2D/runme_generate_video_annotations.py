@@ -44,7 +44,10 @@ for vid_idx in tqdm(range(num_videos)):
     segmentations = []
     segmentations_path = os.path.join(vid_rootpath, 'annotations', vid_files[vid_idx], 'segmentations')
     segmentations_files_list = sorted(os.listdir(segmentations_path))
-    
+    pose = []
+    pose_path = os.path.join(vid_rootpath, 'annotations', vid_files[vid_idx], 'coor_2d')
+    pose_files_list = sorted(os.listdir(pose_path))
+
     areas = []
     for category_idx in range(num_annotations):
         for bbox_idx in range(len(bboxes_files_list)):

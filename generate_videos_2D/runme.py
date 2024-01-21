@@ -68,7 +68,7 @@ imageSizeY = 640
 bufferX = 30
 bufferY = 30
 ############################################################
-for mat_file_idx in tqdm(range(0, 600)):
+for mat_file_idx in tqdm(range(0, 1)):
     # Load the array of pose angles : generated_pose_all_2D_50k
     # The angles are sampled from a probability distribution learnt from the  distribution of real poses (see manuscript)
     filepath = os.path.join(trajectory_folder, str(mat_file_idx).rjust(3, '0') + '.mat')
@@ -134,7 +134,6 @@ for mat_file_idx in tqdm(range(0, 600)):
         for segmentation, area in zip(segmentations, areas):
             segmentation_annotation.append({'segmentations': segmentation, 'area': area})
         if render_spots:
-            #for i in range(0,4):
             for ellipse_idx in range(0, np.random.randint(4)):
                 ellipse_x = int(graymodel.shape[1]*np.random.rand(1))
                 ellipse_y = int(graymodel.shape[0]*np.random.rand(1))
