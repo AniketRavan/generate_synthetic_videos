@@ -44,7 +44,7 @@ for vid_idx in tqdm(range(num_videos)):
     segmentations = []
     segmentations_path = os.path.join(vid_rootpath, 'annotations', vid_files[vid_idx], 'segmentations')
     segmentations_files_list = sorted(os.listdir(segmentations_path))
-    pose = []
+    poses = []
     pose_path = os.path.join(vid_rootpath, 'annotations', vid_files[vid_idx], 'coor_2d')
     pose_files_list = sorted(os.listdir(pose_path))
 
@@ -53,6 +53,8 @@ for vid_idx in tqdm(range(num_videos)):
         for bbox_idx in range(len(bboxes_files_list)):
             #bbox = torch.load(os.path.join(bboxes_path, bboxes_files_list[bbox_idx]))
             #bboxes.append(bbox.tolist())
+            pose = torch.load(os.path.join(pose_path, pose_files_list[bbox_idx]))
+            poses.append(pose.tolist())
             with open(os.path.join(segmentations_path, segmentations_files_list[bbox_idx]), "rb") as fp:
                 segmentation_annotation = pickle.load(fp)[category_idx]
             segmentation_dict = {'counts': segmentation_annotation['segmentations']['counts'].decode('ascii'), 'size': segmentation_annotation['segmentations']['size']}
@@ -62,7 +64,7 @@ for vid_idx in tqdm(range(num_videos)):
             bboxes.append(bbox.tolist())
             areas.append(int(segmentation_annotation['area']))
         annotations_dict = {'video_id': vid_idx + 1, 'iscrowd': 0, 'height': height, 'width': width, \
-                    'length': 1, 'bboxes': bboxes, 'category_id': category_idx + 1, 'id': annotation_idx, 'segmentations': segmentations, 'areas': areas}
+                'length': 1, 'bboxes': bboxes, 'category_id': category_idx + 1, 'id': annotation_idx, 'segmentations': segmentations, 'areas': areas, 'poses': poses}
         data['annotations'].append(annotations_dict)
         annotation_idx += 1 
 
