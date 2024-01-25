@@ -4,7 +4,7 @@ generate_videos_2D/danio2d
 generate_videos_2D/danio2d_small
 generate_videos_2D/Mask2Former/datasets/danio2d_small
 generate_videos_2D/Mask2Former/danio2d_small
-generate_videos_2D/Mask2Former/output
+generate_videos_2D/Mask2Former/output*
 generate_videos_2D/umap_videos
 generate_videos_2D/test_video*
 generate_videos_2D/*.zip
