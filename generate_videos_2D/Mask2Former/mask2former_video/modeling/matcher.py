@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
 from torch import nn
 from torch.cuda.amp import autocast
+import pdb
 
 from detectron2.projects.point_rend.point_features import point_sample
 
@@ -141,6 +142,7 @@ class VideoHungarianMatcher(nn.Module):
                 cost_dice = batch_dice_loss_jit(out_mask, tgt_mask)
             
             # Final cost matrix
+            pdb.set_trace()
             C = (
                 self.cost_mask * cost_mask
                 + self.cost_class * cost_class

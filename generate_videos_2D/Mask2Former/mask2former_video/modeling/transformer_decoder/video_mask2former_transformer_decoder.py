@@ -13,7 +13,8 @@ from detectron2.layers import Conv2d
 from mask2former.modeling.transformer_decoder.maskformer_transformer_decoder import TRANSFORMER_DECODER_REGISTRY
 
 from .position_encoding import PositionEmbeddingSine3D
-
+import pdb
+import torchvision.transforms as T
 
 class SelfAttentionLayer(nn.Module):
 
@@ -205,6 +206,20 @@ class MLP(nn.Module):
         return x
 
 
+class MLP_pose(nn.Module):
+    """ Very simple multi-layer perceptron (also called FFN)"""
+
+    def __init__(self, input_dim,  output_dim):
+        super().__init__()
+        
+        self.layers = nn.ModuleList([nn.Linear(input_dim, input_dim//8), nn.Linear(input_dim//8, input_dim//64), nn.Linear(input_dim//64, output_dim)])
+        self.num_layers = len(self.layers)
+
+    def forward(self, x):
+        for i, layer in enumerate(self.layers):
+            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+        return x.sigmoid()
+
 @TRANSFORMER_DECODER_REGISTRY.register()
 class VideoMultiScaleMaskedTransformerDecoder(nn.Module):
 
@@ -337,6 +352,8 @@ class VideoMultiScaleMaskedTransformerDecoder(nn.Module):
         if self.mask_classification:
             self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
         self.mask_embed = MLP(hidden_dim, hidden_dim, mask_dim, 3)
+        self.pose_embed = MLP_pose(9216, 24) # 96*96
+        self.resize = T.Resize([96,96])
 
     @classmethod
     def from_config(cls, cfg, in_channels, mask_classification):
@@ -398,11 +415,13 @@ class VideoMultiScaleMaskedTransformerDecoder(nn.Module):
 
         predictions_class = []
         predictions_mask = []
+        predictions_pose = []
 
         # prediction heads on learnable query features
-        outputs_class, outputs_mask, attn_mask = self.forward_prediction_heads(output, mask_features, attn_mask_target_size=size_list[0])
+        outputs_class, outputs_mask, outputs_pose, attn_mask = self.forward_prediction_heads(output, mask_features, attn_mask_target_size=size_list[0])
         predictions_class.append(outputs_class)
         predictions_mask.append(outputs_mask)
+        predictions_pose.append(outputs_pose)
 
         for i in range(self.num_layers):
             level_index = i % self.num_feature_levels
@@ -426,17 +445,19 @@ class VideoMultiScaleMaskedTransformerDecoder(nn.Module):
                 output
             )
 
-            outputs_class, outputs_mask, attn_mask = self.forward_prediction_heads(output, mask_features, attn_mask_target_size=size_list[(i + 1) % self.num_feature_levels])
+            outputs_class, outputs_mask, outputs_pose, attn_mask = self.forward_prediction_heads(output, mask_features, attn_mask_target_size=size_list[(i + 1) % self.num_feature_levels])
             predictions_class.append(outputs_class)
             predictions_mask.append(outputs_mask)
+            predictions_pose.append(outputs_pose)
 
         assert len(predictions_class) == self.num_layers + 1
 
         out = {
+            'pred_poses': predictions_pose[-1],
             'pred_logits': predictions_class[-1],
             'pred_masks': predictions_mask[-1],
             'aux_outputs': self._set_aux_loss(
-                predictions_class if self.mask_classification else None, predictions_mask
+                predictions_class if self.mask_classification else None, predictions_mask, predictions_pose
             )
         }
         return out
@@ -448,6 +469,10 @@ class VideoMultiScaleMaskedTransformerDecoder(nn.Module):
         mask_embed = self.mask_embed(decoder_output)
         outputs_mask = torch.einsum("bqc,btchw->bqthw", mask_embed, mask_features)
         b, q, t, _, _ = outputs_mask.shape
+        resize_mask = self.resize(outputs_mask.flatten(0,2))
+        outputs_pose = self.pose_embed(resize_mask.flatten(-2))
+        outputs_pose = outputs_pose.reshape(b,q,t, -1)
+
 
         # NOTE: prediction is of higher-resolution
         # [B, Q, T, H, W] -> [B, Q, T*H*W] -> [B, h, Q, T*H*W] -> [B*h, Q, T*HW]
@@ -458,17 +483,17 @@ class VideoMultiScaleMaskedTransformerDecoder(nn.Module):
         attn_mask = (attn_mask.sigmoid().flatten(2).unsqueeze(1).repeat(1, self.num_heads, 1, 1).flatten(0, 1) < 0.5).bool()
         attn_mask = attn_mask.detach()
 
-        return outputs_class, outputs_mask, attn_mask
+        return outputs_class, outputs_mask, outputs_pose, attn_mask
 
     @torch.jit.unused
-    def _set_aux_loss(self, outputs_class, outputs_seg_masks):
+    def _set_aux_loss(self, outputs_class, outputs_seg_masks, outputs_pose):
         # this is a workaround to make torchscript happy, as torchscript
         # doesn't support dictionary with non-homogeneous values, such
         # as a dict having both a Tensor and a list.
         if self.mask_classification:
             return [
-                {"pred_logits": a, "pred_masks": b}
-                for a, b in zip(outputs_class[:-1], outputs_seg_masks[:-1])
+                    {"pred_logits": a, "pred_masks": b, "pred_poses": c}
+                    for a, b, c  in zip(outputs_class[:-1], outputs_seg_masks[:-1], outputs_pose[:-1])
             ]
         else:
             return [{"pred_masks": b} for b in outputs_seg_masks[:-1]]

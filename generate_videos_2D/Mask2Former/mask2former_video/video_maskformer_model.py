@@ -186,10 +186,12 @@ class VideoMaskFormer(nn.Module):
         features = self.backbone(images.tensor)
         outputs = self.sem_seg_head(features)
 
+
         if self.training:
             # mask classification target
             targets = self.prepare_targets(batched_inputs, images)
-
+            
+            pdb.set_trace()
             # bipartite matching-based loss
             losses = self.criterion(outputs, targets)
 
