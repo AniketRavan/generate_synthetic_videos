@@ -15,6 +15,9 @@ from detectron2.structures import Instances
 from detectron2.utils.video_visualizer import VideoVisualizer
 from detectron2.utils.visualizer import ColorMode
 
+import pdb
+import json 
+import pycocotools.mask as cocomask
 
 class VisualizationDemo(object):
     def __init__(self, cfg, instance_mode=ColorMode.IMAGE, parallel=False):
@@ -32,13 +35,13 @@ class VisualizationDemo(object):
         self.instance_mode = instance_mode
 
         self.parallel = parallel
-        if parallel:
-            num_gpu = torch.cuda.device_count()
-            self.predictor = AsyncPredictor(cfg, num_gpus=num_gpu)
-        else:
-            self.predictor = VideoPredictor(cfg)
+        #if parallel:
+        #    num_gpu = torch.cuda.device_count()
+        #    self.predictor = AsyncPredictor(cfg, num_gpus=num_gpu)
+        #else:
+        #    self.predictor = VideoPredictor(cfg)
 
-    def run_on_video(self, frames):
+    def run_on_video(self, frames, confidence_thresh=0.85):
         """
         Args:
             frames (List[np.ndarray]): a list of images of shape (H, W, C) (in BGR order).
@@ -48,24 +51,41 @@ class VisualizationDemo(object):
             vis_output (VisImage): the visualized image output.
         """
         vis_output = None
-        predictions = self.predictor(frames)
-
-        image_size = predictions["image_size"]
-        pred_scores = predictions["pred_scores"]
-        pred_labels = predictions["pred_labels"]
-        pred_masks = predictions["pred_masks"]
-
-        frame_masks = list(zip(*pred_masks))
+        #predictions = self.predictor(frames)
+        predictions = json.load(open('../output/inference/results.json'))
+        #image_size = predictions["image_size"]
+        #pred_scores = predictions["pred_scores"]
+        #pred_labels = predictions["pred_labels"]
+        #pred_masks = predictions["pred_masks"]
+        image_size = frames[0].shape
+        #frame_masks = list(zip(*pred_masks))
         total_vis_output = []
-        for frame_idx in range(len(frames)):
+        for frame_idx in range(4):
+        #for frame_idx in range(len(frames)):
             frame = frames[frame_idx][:, :, ::-1]
             visualizer = TrackVisualizer(frame, self.metadata, instance_mode=self.instance_mode)
             ins = Instances(image_size)
-            if len(pred_scores) > 0:
-                ins.scores = pred_scores
-                ins.pred_classes = pred_labels
-                ins.pred_masks = torch.stack(frame_masks[frame_idx], dim=0)
-
+            if len(predictions) > 0:
+            #if len(pred_scores) > 0:
+                ins.scores = []
+                ins.pred_classes = []
+                ins.pred_masks = []
+                #for pred_score, pred_class, pred_mask in zip(pred_scores, pred_labels, frame_masks[frame_idx]):
+                for prediction in predictions:
+                    if (prediction['score'] > 0.85):
+                        ins.scores.append(prediction['score'])
+                        ins.pred_classes.append(prediction['category_id'] - 1)
+                        decoded_mask = cocomask.decode(prediction['segmentations'][frame_idx])
+                        decoded_mask = torch.tensor(decoded_mask)
+                        ins.pred_masks.append(decoded_mask)
+                    #if (pred_score > confidence_thresh):
+                        #ins.scores.append(pred_score)
+                        #ins.pred_classes.append(pred_class)
+                        #ins.pred_masks.append(pred_mask)
+                    #ins.scores = pred_scores
+                    #ins.pred_classes = pred_labels
+                    #ins.pred_masks = torch.stack(frame_mass[frame_idx], dim=0)
+            #pdb.set_trace()
             vis_output = visualizer.draw_instance_predictions(predictions=ins)
             total_vis_output.append(vis_output)
 
@@ -112,7 +132,6 @@ class VideoPredictor(DefaultPredictor):
                 image = self.aug.get_transform(original_image).apply_image(original_image)
                 image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
                 input_frames.append(image)
-
             inputs = {"image": input_frames, "height": height, "width": width}
             predictions = self.model([inputs])
             return predictions

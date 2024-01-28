@@ -29,6 +29,7 @@ from mask2former import add_maskformer2_config
 from mask2former_video import add_maskformer2_video_config
 from predictor import VisualizationDemo
 
+import pdb
 
 # constants
 WINDOW_NAME = "mask2former video demo"
@@ -112,7 +113,6 @@ if __name__ == "__main__":
     setup_logger(name="fvcore")
     logger = setup_logger()
     logger.info("Arguments: " + str(args))
-
     cfg = setup_cfg(args)
 
     demo = VisualizationDemo(cfg)
@@ -124,41 +124,42 @@ if __name__ == "__main__":
         if len(args.input) == 1:
             args.input = glob.glob(os.path.expanduser(args.input[0]))
             assert args.input, "The input path(s) was not found"
-
         vid_frames = []
-        for path in args.input:
+        filenames = sorted(os.listdir(args.input[0]))
+        #for path in args.input:
+        path_list = [os.path.join(args.input[0], k) for k in filenames]
+        for path in path_list:
             img = read_image(path, format="BGR")
             vid_frames.append(img)
 
         start_time = time.time()
         with autocast():
             predictions, visualized_output = demo.run_on_video(vid_frames)
-        logger.info(
-            "detected {} instances per frame in {:.2f}s".format(
-                len(predictions["pred_scores"]), time.time() - start_time
-            )
-        )
+        #logger.info(
+        #    "detected {} instances per frame in {:.2f}s".format(
+        #        len(prediction["pred_scores"]), time.time() - start_time
+        #    )
+        #)
 
         if args.output:
             if args.save_frames:
-                for path, _vis_output in zip(args.input, visualized_output):
+                #for path, _vis_output in zip(args.input, visualized_output):
+                for path, _vis_output in zip(path_list, visualized_output):    
                     out_filename = os.path.join(args.output, os.path.basename(path))
                     _vis_output.save(out_filename)
 
             H, W = visualized_output[0].height, visualized_output[0].width
-
-            cap = cv2.VideoCapture(-1)
+            #cap = cv2.VideoCapture(-1)
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             out = cv2.VideoWriter(os.path.join(args.output, "visualization.mp4"), fourcc, 10.0, (W, H), True)
             for _vis_output in visualized_output:
                 frame = _vis_output.get_image()[:, :, ::-1]
                 out.write(frame)
-            cap.release()
+            #cap.release()
             out.release()
 
     elif args.video_input:
         video = cv2.VideoCapture(args.video_input)
-        
         vid_frames = []
         while video.isOpened():
             success, frame = video.read()
@@ -166,7 +167,7 @@ if __name__ == "__main__":
                 vid_frames.append(frame)
             else:
                 break
-
+        
         start_time = time.time()
         with autocast():
             predictions, visualized_output = demo.run_on_video(vid_frames)
