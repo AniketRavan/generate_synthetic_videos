@@ -76,8 +76,6 @@ def batch_pose_mse_loss(inputs: torch.Tensor, targets: torch.Tensor):
     Returns:
         Loss tensor
     """
-
-    hw = inputs.shape[1]
     loss = nn.MSELoss(reduction='mean')
     mse_loss = loss(inputs, targets)
     return mse_loss
@@ -133,9 +131,10 @@ class VideoHungarianMatcher(nn.Module):
             out_mask = outputs["pred_masks"][b]  # [num_queries, T, H_pred, W_pred]
             # gt masks are already padded when preparing target
             tgt_mask = targets[b]["masks"].to(out_mask)  # [num_gts, T, H_pred, W_pred]
+            
+            out_pose = outputs["pred_poses"][b]
+            tgt_pose = targets[b]["poses"].to(out_pose)
 
-            # out_mask = out_mask[:, None]
-            # tgt_mask = tgt_mask[:, None]
             # all masks share the same set of points for efficient matching!
             point_coords = torch.rand(1, self.num_points, 2, device=out_mask.device)
             # get gt labels
@@ -154,6 +153,7 @@ class VideoHungarianMatcher(nn.Module):
             with autocast(enabled=False):
                 out_mask = out_mask.float()
                 tgt_mask = tgt_mask.float()
+                
                 # Compute the focal loss between masks
                 cost_mask = batch_sigmoid_ce_loss_jit(out_mask, tgt_mask)
 

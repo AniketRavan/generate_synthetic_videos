@@ -81,8 +81,8 @@ def pose_mse_loss(
     Returns:
         Loss tensor
     """
-    loss = F.mse_loss(inputs, targets, reduction='mean')
-    return loss
+    loss = F.mse_loss(inputs, targets, reduction='sum')
+    return loss / num_masks
 
 pose_mse_loss_jit = torch.jit.script(
     pose_mse_loss
@@ -204,12 +204,17 @@ class VideoSetCriterion(nn.Module):
         return losses
 
     ##TODO
-    def loss_pose(self, outputs, targets):
+    def loss_poses(self, outputs, targets, indices, num_masks):
         """Compute mean square error (mse) loss for pose.
         target dicts yet to be defined. Tensor size of dim [nb_target_boxes, 2, 12)
         """
+        
+        src_idx = self._get_src_permutation_idx(indices)
+        src_poses = outputs["pred_poses"]
+        src_poses = src_poses[src_idx]
+        target_poses = torch.cat([t['poses'][i] for t, (_, i) in zip(targets, indices)]).to(src_poses)
         losses = {
-                "loss_pose": pose_mse_loss_jit(),
+                "loss_pose": pose_mse_loss_jit(src_poses, target_poses, num_masks),
         }
         return losses
 
@@ -229,6 +234,7 @@ class VideoSetCriterion(nn.Module):
         loss_map = {
             'labels': self.loss_labels,
             'masks': self.loss_masks,
+            'poses': self.loss_poses,
         }
         assert loss in loss_map, f"do you really want to compute {loss} loss?"
         return loss_map[loss](outputs, targets, indices, num_masks)
