@@ -69,6 +69,24 @@ sigmoid_ce_loss_jit = torch.jit.script(
     sigmoid_ce_loss
 )  # type: torch.jit.ScriptModule
 
+def pose_mse_loss(
+    inputs: torch.Tensor,
+    targets: torch.Tensor, 
+    ):
+    """
+    Args:
+        inputs: A float tensor of arbitrary shape.
+            The predictions for each example.
+        targets: A float tensor with the same shape as inputs. Stores the pose for each element in inputs
+    Returns:
+        Loss tensor
+    """
+    loss = F.mse_loss(inputs, targets, reduction='mean')
+    return loss
+
+pose_mse_loss_jit = torch.jit.script(
+    pose_mse_loss
+)
 
 def calculate_uncertainty(logits):
     """
@@ -183,6 +201,16 @@ class VideoSetCriterion(nn.Module):
 
         del src_masks
         del target_masks
+        return losses
+
+    ##TODO
+    def loss_pose(self, outputs, targets):
+        """Compute mean square error (mse) loss for pose.
+        target dicts yet to be defined. Tensor size of dim [nb_target_boxes, 2, 12)
+        """
+        losses = {
+                "loss_pose": pose_mse_loss_jit(),
+        }
         return losses
 
     def _get_src_permutation_idx(self, indices):

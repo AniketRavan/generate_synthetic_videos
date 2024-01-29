@@ -48,7 +48,6 @@ def batch_sigmoid_ce_loss(inputs: torch.Tensor, targets: torch.Tensor):
         Loss tensor
     """
     hw = inputs.shape[1]
-
     pos = F.binary_cross_entropy_with_logits(
         inputs, torch.ones_like(inputs), reduction="none"
     )
@@ -67,6 +66,25 @@ batch_sigmoid_ce_loss_jit = torch.jit.script(
     batch_sigmoid_ce_loss
 )  # type: torch.jit.ScriptModule
 
+def batch_pose_mse_loss(inputs: torch.Tensor, targets: torch.Tensor):
+    """
+    Args:
+        inputs: A float tensor of arbitrary shape
+                The predictions for each example
+        targets: A float tensor with the same shape as inputs. Stores the pose for each element in inputs
+        
+    Returns:
+        Loss tensor
+    """
+
+    hw = inputs.shape[1]
+    loss = nn.MSELoss(reduction='mean')
+    mse_loss = loss(inputs, targets)
+    return mse_loss
+
+batch_pose_mse_loss_jit = torch.jit.script(
+    batch_pose_mse_loss
+)
 
 class VideoHungarianMatcher(nn.Module):
     """This class computes an assignment between the targets and the predictions of the network
@@ -76,7 +94,7 @@ class VideoHungarianMatcher(nn.Module):
     while the others are un-matched (and thus treated as non-objects).
     """
 
-    def __init__(self, cost_class: float = 1, cost_mask: float = 1, cost_dice: float = 1, num_points: int = 0):
+    def __init__(self, cost_class: float = 1, cost_mask: float = 1, cost_dice: float = 1, cost_pose: float 1, num_points: int = 0):
         """Creates the matcher
 
         Params:
@@ -88,8 +106,9 @@ class VideoHungarianMatcher(nn.Module):
         self.cost_class = cost_class
         self.cost_mask = cost_mask
         self.cost_dice = cost_dice
+        self.cost_pose = cost_pose
 
-        assert cost_class != 0 or cost_mask != 0 or cost_dice != 0, "all costs cant be 0"
+        assert cost_class != 0 or cost_mask != 0 or cost_dice != 0 or cost_pose !=0, "all costs cant be 0"
 
         self.num_points = num_points
 
@@ -140,13 +159,17 @@ class VideoHungarianMatcher(nn.Module):
 
                 # Compute the dice loss betwen masks
                 cost_dice = batch_dice_loss_jit(out_mask, tgt_mask)
-            
+                
+                # Compute the mse loss between poses
+                cost_pose = batch_pose_mse_loss_jit(out_pose, tgt_pose)
+                
             # Final cost matrix
             pdb.set_trace()
             C = (
                 self.cost_mask * cost_mask
                 + self.cost_class * cost_class
                 + self.cost_dice * cost_dice
+                + self.cost_pose * cost_pose
             )
             C = C.reshape(num_queries, -1).cpu()
 
