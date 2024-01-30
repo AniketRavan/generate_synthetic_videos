@@ -22,6 +22,8 @@ from typing import Any, Dict, List, Set
 
 import torch
 
+import pdb
+
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
@@ -41,6 +43,9 @@ from detectron2.evaluation import (
 from detectron2.projects.deeplab import add_deeplab_config, build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.utils.logger import setup_logger
+
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module='torch.nn.functional')
 
 # MaskFormer
 from mask2former import add_maskformer2_config
@@ -83,7 +88,6 @@ class Trainer(DefaultTrainer):
             filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS,
             proposal_files=cfg.DATASETS.PROPOSAL_FILES_TRAIN if cfg.MODEL.LOAD_PROPOSALS else None,
         )
-
         return build_detection_train_loader(cfg, mapper=mapper, dataset=dataset_dict)
 
     @classmethod

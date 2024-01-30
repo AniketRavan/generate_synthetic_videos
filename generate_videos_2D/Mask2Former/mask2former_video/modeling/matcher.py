@@ -76,8 +76,10 @@ def batch_pose_mse_loss(inputs: torch.Tensor, targets: torch.Tensor):
     Returns:
         Loss tensor
     """
-    loss = nn.MSELoss(reduction='mean')
-    mse_loss = loss(inputs, targets)
+    # mse_loss = F.mse_loss(inputs, targets, reduction='mean')
+    reshaped_inputs = inputs.flatten(1).unsqueeze(1).permute(2,0,1)
+    reshaped_targets = targets.unsqueeze(0).flatten(2).permute(2,0,1).expand_as(reshaped_inputs)
+    mse_loss = F.mse_loss(reshaped_inputs, reshaped_targets, reduction="none").mean(0)
     return mse_loss
 
 batch_pose_mse_loss_jit = torch.jit.script(
@@ -92,7 +94,7 @@ class VideoHungarianMatcher(nn.Module):
     while the others are un-matched (and thus treated as non-objects).
     """
 
-    def __init__(self, cost_class: float = 1, cost_mask: float = 1, cost_dice: float = 1, cost_pose: float 1, num_points: int = 0):
+    def __init__(self, cost_class: float = 1, cost_mask: float = 1, cost_dice: float = 1, cost_pose: float = 1, num_points: int = 0):
         """Creates the matcher
 
         Params:
@@ -137,6 +139,7 @@ class VideoHungarianMatcher(nn.Module):
 
             # all masks share the same set of points for efficient matching!
             point_coords = torch.rand(1, self.num_points, 2, device=out_mask.device)
+            
             # get gt labels
             tgt_mask = point_sample(
                 tgt_mask,
@@ -164,7 +167,6 @@ class VideoHungarianMatcher(nn.Module):
                 cost_pose = batch_pose_mse_loss_jit(out_pose, tgt_pose)
                 
             # Final cost matrix
-            pdb.set_trace()
             C = (
                 self.cost_mask * cost_mask
                 + self.cost_class * cost_class

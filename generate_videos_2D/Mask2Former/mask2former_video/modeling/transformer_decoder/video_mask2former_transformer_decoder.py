@@ -472,6 +472,7 @@ class VideoMultiScaleMaskedTransformerDecoder(nn.Module):
         resize_mask = self.resize(outputs_mask.flatten(0,2))
         outputs_pose = self.pose_embed(resize_mask.flatten(-2))
         outputs_pose = outputs_pose.reshape(b,q,t, -1)
+        outputs_pose = outputs_pose.reshape(b,q,t,2,12)
 
 
         # NOTE: prediction is of higher-resolution

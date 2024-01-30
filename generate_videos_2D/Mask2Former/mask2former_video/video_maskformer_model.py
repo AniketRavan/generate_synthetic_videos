@@ -100,16 +100,18 @@ class VideoMaskFormer(nn.Module):
         class_weight = cfg.MODEL.MASK_FORMER.CLASS_WEIGHT
         dice_weight = cfg.MODEL.MASK_FORMER.DICE_WEIGHT
         mask_weight = cfg.MODEL.MASK_FORMER.MASK_WEIGHT
+        pose_weight = cfg.MODEL.MASK_FORMER.MASK_WEIGHT
 
         # building criterion
         matcher = VideoHungarianMatcher(
             cost_class=class_weight,
             cost_mask=mask_weight,
             cost_dice=dice_weight,
+            cost_pose=pose_weight,
             num_points=cfg.MODEL.MASK_FORMER.TRAIN_NUM_POINTS,
         )
 
-        weight_dict = {"loss_ce": class_weight, "loss_mask": mask_weight, "loss_dice": dice_weight}
+        weight_dict = {"loss_ce": class_weight, "loss_mask": mask_weight, "loss_dice": dice_weight, "loss_pose": pose_weight}
 
         if deep_supervision:
             dec_layers = cfg.MODEL.MASK_FORMER.DEC_LAYERS
@@ -191,7 +193,6 @@ class VideoMaskFormer(nn.Module):
             # mask classification target
             targets = self.prepare_targets(batched_inputs, images)
             
-            pdb.set_trace()
             # bipartite matching-based loss
             losses = self.criterion(outputs, targets)
 
@@ -231,7 +232,9 @@ class VideoMaskFormer(nn.Module):
         for targets_per_video in targets:
             _num_instance = len(targets_per_video["instances"][0])
             mask_shape = [_num_instance, self.num_frames, h_pad, w_pad]
+            pose_shape = [_num_instance, self.num_frames, 2, 12]
             gt_masks_per_video = torch.zeros(mask_shape, dtype=torch.bool, device=self.device)
+            gt_poses_per_video = torch.zeros(pose_shape, dtype=torch.float, device=self.device)
 
             gt_ids_per_video = []
             for f_i, targets_per_frame in enumerate(targets_per_video["instances"]):
@@ -240,6 +243,7 @@ class VideoMaskFormer(nn.Module):
 
                 gt_ids_per_video.append(targets_per_frame.gt_ids[:, None])
                 gt_masks_per_video[:, f_i, :h, :w] = targets_per_frame.gt_masks.tensor
+                gt_poses_per_video[:, f_i, :, :] = targets_per_frame.gt_poses
 
             gt_ids_per_video = torch.cat(gt_ids_per_video, dim=1)
             valid_idx = (gt_ids_per_video != -1).any(dim=-1)
@@ -248,9 +252,11 @@ class VideoMaskFormer(nn.Module):
             gt_ids_per_video = gt_ids_per_video[valid_idx]                          # N, num_frames
 
             gt_instances.append({"labels": gt_classes_per_video, "ids": gt_ids_per_video})
+            
             gt_masks_per_video = gt_masks_per_video[valid_idx].float()          # N, num_frames, H, W
-            gt_instances[-1].update({"masks": gt_masks_per_video})
-
+            gt_poses_per_video = gt_poses_per_video[valid_idx].float()
+            gt_instances[-1].update({"masks": gt_masks_per_video, "poses": gt_poses_per_video})
+            
         return gt_instances
 
     def inference_video(self, pred_cls, pred_masks, img_size, output_height, output_width):

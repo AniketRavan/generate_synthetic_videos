@@ -21,6 +21,8 @@ from detectron2.data import transforms as T
 
 from .augmentation import build_augmentation
 
+import pdb
+
 __all__ = ["YTVISDatasetMapper", "CocoClipDatasetMapper"]
 
 
@@ -88,6 +90,10 @@ def ytvis_annotations_to_instances(annos, image_size):
     classes = [int(obj["category_id"]) for obj in annos]
     classes = torch.tensor(classes, dtype=torch.int64)
     target.gt_classes = classes
+    
+    poses = [obj["poses"] for obj in annos]
+    poses = torch.tensor(poses, dtype=torch.float)
+    target.gt_poses = poses
 
     ids = [int(obj["id"]) for obj in annos]
     ids = torch.tensor(ids, dtype=torch.int64)
@@ -201,10 +207,9 @@ class YTVISDatasetMapper:
                 random.shuffle(selected_idx)
         else:
             selected_idx = range(4)#video_length)
-
+        
         video_annos = dataset_dict.pop("annotations", None)
         file_names = dataset_dict.pop("file_names", None)
-
         if self.is_train:
             _ids = set()
             for frame_idx in selected_idx:
@@ -256,16 +261,19 @@ class YTVISDatasetMapper:
                 idx = ids[_anno["id"]]
                 sorted_annos[idx] = _anno
             _gt_ids = [_anno["id"] for _anno in sorted_annos]
-
             instances = utils.annotations_to_instances(sorted_annos, image_shape, mask_format="bitmask")
+            
             instances.gt_ids = torch.tensor(_gt_ids)
+
+            _gt_poses = [_anno["poses"] for _anno in sorted_annos]
+            instances.gt_poses = torch.tensor(_gt_poses) / 640
+
             if instances.has("gt_masks"):
                 instances.gt_boxes = instances.gt_masks.get_bounding_boxes()
                 instances = filter_empty_instances(instances)
             else:
                 instances.gt_masks = BitMasks(torch.empty((0, *image_shape)))
             dataset_dict["instances"].append(instances)
-
         return dataset_dict
 
 
@@ -333,7 +341,6 @@ class CocoClipDatasetMapper:
         img_annos = dataset_dict.pop("annotations", None)
         file_name = dataset_dict.pop("file_name", None)
         original_image = utils.read_image(file_name, format=self.image_format)
-
         dataset_dict["image"] = []
         dataset_dict["instances"] = []
         dataset_dict["file_names"] = [file_name] * self.sampling_frame_num
@@ -370,7 +377,6 @@ class CocoClipDatasetMapper:
             for idx in range(len(annos)):
                 if len(annos[idx]["segmentation"]) == 0:
                     annos[idx]["segmentation"] = [np.array([0.0] * 6)]
-
             instances = utils.annotations_to_instances(annos, image_shape, mask_format="bitmask")
             instances.gt_ids = torch.tensor(_gt_ids)
             if instances.has("gt_masks"):

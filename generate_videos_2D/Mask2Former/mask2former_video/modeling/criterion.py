@@ -72,6 +72,7 @@ sigmoid_ce_loss_jit = torch.jit.script(
 def pose_mse_loss(
     inputs: torch.Tensor,
     targets: torch.Tensor, 
+    num_masks: float,
     ):
     """
     Args:
@@ -81,8 +82,8 @@ def pose_mse_loss(
     Returns:
         Loss tensor
     """
-    loss = F.mse_loss(inputs, targets, reduction='sum')
-    return loss / num_masks
+    loss = F.mse_loss(inputs, targets, reduction='mean')
+    return loss 
 
 pose_mse_loss_jit = torch.jit.script(
     pose_mse_loss

@@ -17,6 +17,7 @@ from detectron2.data.dataset_mapper import DatasetMapper
 from detectron2.data.samplers import InferenceSampler, TrainingSampler
 from detectron2.utils.comm import get_world_size
 
+import pdb
 
 def _compute_num_images_per_worker(cfg: CfgNode):
     num_workers = get_world_size()
@@ -102,7 +103,6 @@ def get_detection_dataset_dicts(
         ]
 
     dataset_dicts = list(itertools.chain.from_iterable(dataset_dicts))
-
     has_instances = "annotations" in dataset_dicts[0]
     if filter_empty and has_instances:
         dataset_dicts = filter_images_with_only_crowd_annotations(dataset_dicts, dataset_names)

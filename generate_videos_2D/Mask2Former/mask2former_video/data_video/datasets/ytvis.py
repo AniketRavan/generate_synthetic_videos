@@ -10,7 +10,6 @@ import os
 import pycocotools.mask as mask_util
 from fvcore.common.file_io import PathManager
 from fvcore.common.timer import Timer
-import pdb
 
 from detectron2.structures import Boxes, BoxMode, PolygonMasks
 from detectron2.data import DatasetCatalog, MetadataCatalog
@@ -232,7 +231,6 @@ Category ids in annotations are not in [1, #categories]! We'll apply a mapping f
         record["width"] = vid_dict["width"]
         record["length"] = vid_dict["length"]
         video_id = record["video_id"] = vid_dict["id"]
-
         video_objs = []
         for frame_idx in range(record["length"]):
             frame_objs = []
@@ -240,15 +238,15 @@ Category ids in annotations are not in [1, #categories]! We'll apply a mapping f
                 assert anno["video_id"] == video_id
 
                 obj = {key: anno[key] for key in ann_keys if key in anno}
-
                 _bboxes = anno.get("bboxes", None)
                 _segm = anno.get("segmentations", None)
-                if not (_bboxes and _segm and _bboxes[frame_idx] and _segm[frame_idx]):
+                _poses = anno.get("poses", None)
+                if not (_bboxes and _segm and _bboxes[frame_idx] and _segm[frame_idx] and _poses[frame_idx]):
                     continue
 
                 bbox = _bboxes[frame_idx]
                 segm = _segm[frame_idx]
-
+                poses = _poses[frame_idx]
                 obj["bbox"] = bbox
                 obj["bbox_mode"] = BoxMode.XYWH_ABS
 
@@ -263,6 +261,8 @@ Category ids in annotations are not in [1, #categories]! We'll apply a mapping f
                         num_instances_without_valid_segmentation += 1
                         continue  # ignore this instance
                 obj["segmentation"] = segm
+
+                obj["poses"] = poses
 
                 if id_map:
                     obj["category_id"] = id_map[obj["category_id"]]
