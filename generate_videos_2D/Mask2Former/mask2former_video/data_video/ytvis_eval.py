@@ -22,7 +22,7 @@ from detectron2.data import MetadataCatalog
 from detectron2.evaluation import DatasetEvaluator
 from detectron2.utils.file_io import PathManager
 from detectron2.utils.logger import create_small_table
-
+import pdb
 
 class YTVISEvaluator(DatasetEvaluator):
     """
@@ -272,9 +272,10 @@ def instances_to_coco_json_video(inputs, outputs):
     scores = outputs["pred_scores"]
     labels = outputs["pred_labels"]
     masks = outputs["pred_masks"]
-
+    poses = outputs["pred_poses"]
+    
     ytvis_results = []
-    for instance_id, (s, l, m) in enumerate(zip(scores, labels, masks)):
+    for instance_id, (s, l, m, p) in enumerate(zip(scores, labels, masks, poses)):
         segms = [
             mask_util.encode(np.array(_mask[:, :, None], order="F", dtype="uint8"))[0]
             for _mask in m
@@ -287,6 +288,7 @@ def instances_to_coco_json_video(inputs, outputs):
             "score": s,
             "category_id": l,
             "segmentations": segms,
+            "poses": p.tolist(),
         }
         ytvis_results.append(res)
 

@@ -78,13 +78,13 @@ def batch_pose_mse_loss(inputs: torch.Tensor, targets: torch.Tensor):
     """
     # mse_loss = F.mse_loss(inputs, targets, reduction='mean')
     reshaped_inputs = inputs.flatten(1).unsqueeze(1).permute(2,0,1)
-    reshaped_targets = targets.unsqueeze(0).flatten(2).permute(2,0,1).expand_as(reshaped_inputs)
+    reshaped_targets = targets.unsqueeze(0).flatten(2).permute(2,0,1)#.expand_as(reshaped_inputs)
     mse_loss = F.mse_loss(reshaped_inputs, reshaped_targets, reduction="none").mean(0)
     return mse_loss
 
-batch_pose_mse_loss_jit = torch.jit.script(
-    batch_pose_mse_loss
-)
+#batch_pose_mse_loss_jit = torch.jit.script(
+#    batch_pose_mse_loss
+#)
 
 class VideoHungarianMatcher(nn.Module):
     """This class computes an assignment between the targets and the predictions of the network
@@ -101,6 +101,7 @@ class VideoHungarianMatcher(nn.Module):
             cost_class: This is the relative weight of the classification error in the matching cost
             cost_mask: This is the relative weight of the focal loss of the binary mask in the matching cost
             cost_dice: This is the relative weight of the dice loss of the binary mask in the matching cost
+            cost_pose: This is the relavtive weight of the mean squared pose error
         """
         super().__init__()
         self.cost_class = cost_class
@@ -164,7 +165,7 @@ class VideoHungarianMatcher(nn.Module):
                 cost_dice = batch_dice_loss_jit(out_mask, tgt_mask)
                 
                 # Compute the mse loss between poses
-                cost_pose = batch_pose_mse_loss_jit(out_pose, tgt_pose)
+                cost_pose = batch_pose_mse_loss(out_pose, tgt_pose)
                 
             # Final cost matrix
             C = (

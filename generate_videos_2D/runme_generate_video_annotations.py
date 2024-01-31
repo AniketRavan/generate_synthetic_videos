@@ -19,7 +19,7 @@ current_path = ''
 ####
 width = 640
 height = 640
-vid_files = os.listdir('danio2d_small/train/images/')
+vid_files = os.listdir('danio2d_small/val/images/')
 num_videos = len(vid_files)
 ####
 
@@ -27,7 +27,7 @@ annotation_idx = 1
 for vid_idx in tqdm(range(num_videos)):
 #for vid_idx in range(2):
     filenames = []
-    vid_rootpath = os.path.join(current_path, 'danio2d_small/train')
+    vid_rootpath = os.path.join(current_path, 'danio2d_small/val')
     frames = os.listdir(os.path.join(vid_rootpath, 'images', vid_files[vid_idx]))
     num_frames = len(frames)
     for frame_idx in range(len(frames)):
@@ -69,5 +69,5 @@ for vid_idx in tqdm(range(num_videos)):
         annotation_idx += 1 
 
 
-with open('train.json', 'w') as json_file:
+with open('val.json', 'w') as json_file:
     json.dump(data, json_file)

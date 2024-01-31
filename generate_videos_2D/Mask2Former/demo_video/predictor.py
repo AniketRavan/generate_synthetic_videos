@@ -52,7 +52,7 @@ class VisualizationDemo(object):
         """
         vis_output = None
         #predictions = self.predictor(frames)
-        predictions = json.load(open('../output/inference/results.json'))
+        predictions = json.load(open('../output_lr_001/inference/results.json'))
         #image_size = predictions["image_size"]
         #pred_scores = predictions["pred_scores"]
         #pred_labels = predictions["pred_labels"]
@@ -70,14 +70,18 @@ class VisualizationDemo(object):
                 ins.scores = []
                 ins.pred_classes = []
                 ins.pred_masks = []
+                ins.pred_keypoints = []
                 #for pred_score, pred_class, pred_mask in zip(pred_scores, pred_labels, frame_masks[frame_idx]):
                 for prediction in predictions:
-                    if (prediction['score'] > 0.85):
+                    if (prediction['score'] > 0.0):
                         ins.scores.append(prediction['score'])
                         ins.pred_classes.append(prediction['category_id'] - 1)
                         decoded_mask = cocomask.decode(prediction['segmentations'][frame_idx])
                         decoded_mask = torch.tensor(decoded_mask)
                         ins.pred_masks.append(decoded_mask)
+                        coco_keypoints = torch.tensor(prediction['poses'][frame_idx]).permute(1,0)
+                        coco_keypoints = torch.cat((640*coco_keypoints, torch.ones(coco_keypoints.shape[0], 1)), axis=1)
+                        ins.pred_keypoints.append(coco_keypoints)
                     #if (pred_score > confidence_thresh):
                         #ins.scores.append(pred_score)
                         #ins.pred_classes.append(pred_class)
@@ -85,10 +89,11 @@ class VisualizationDemo(object):
                     #ins.scores = pred_scores
                     #ins.pred_classes = pred_labels
                     #ins.pred_masks = torch.stack(frame_mass[frame_idx], dim=0)
-            #pdb.set_trace()
-            vis_output = visualizer.draw_instance_predictions(predictions=ins)
+            if (ins.pred_keypoints):
+                vis_output = visualizer.draw_and_connect_keypoints(ins.pred_keypoints[0])
+            #vis_output = visualizer.overlay_instances(labels=ins.pred_classes,  keypoints=ins.pred_keypoints, alpha=0.75)
+            #vis_output = visualizer.draw_instance_predictions(predictions=ins)
             total_vis_output.append(vis_output)
-
         return predictions, total_vis_output
 
 

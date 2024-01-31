@@ -10,3 +10,6 @@ generate_videos_2D/test_video*
 generate_videos_2D/*.zip
 generate_videos_2D/training_dataset
 generate_videos_2D/Mask2Former/demo_video/visualization_output/
+generate_videos_2D/Mask2Former/datasets/danio2d_small_1train_1val/
+generate_videos_2D/Mask2Former/demo_video/visualization_output_masks_only/
+generate_videos_2D/Mask2Former/test_output/

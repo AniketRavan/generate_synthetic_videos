@@ -1,0 +1,1 @@
+python demo.py --config-file ../test_output/config.yaml --input ../datasets/danio2d_small/val/images/001/ --save-frames True --output visualization_output --opts MODEL.WEIGHTS ../test_output/model_final.pth 

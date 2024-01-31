@@ -19,6 +19,8 @@ from .modeling.matcher import VideoHungarianMatcher
 from .utils.memory import retry_if_cuda_oom
 import pdb
 logger = logging.getLogger(__name__)
+import time
+import matplotlib.pyplot as plt
 
 
 @META_ARCH_REGISTRY.register()
@@ -100,8 +102,7 @@ class VideoMaskFormer(nn.Module):
         class_weight = cfg.MODEL.MASK_FORMER.CLASS_WEIGHT
         dice_weight = cfg.MODEL.MASK_FORMER.DICE_WEIGHT
         mask_weight = cfg.MODEL.MASK_FORMER.MASK_WEIGHT
-        pose_weight = cfg.MODEL.MASK_FORMER.MASK_WEIGHT
-
+        pose_weight = cfg.MODEL.MASK_FORMER.POSE_WEIGHT
         # building criterion
         matcher = VideoHungarianMatcher(
             cost_class=class_weight,
@@ -193,21 +194,34 @@ class VideoMaskFormer(nn.Module):
             # mask classification target
             targets = self.prepare_targets(batched_inputs, images)
             
-            # bipartite matching-based loss
-            losses = self.criterion(outputs, targets)
 
+            # bipartite matching-based loss
+            losses, indices = self.criterion(outputs, targets)
+            t1 = time.time()
+            output_pose = outputs["pred_poses"][0][indices[0]][0].detach()
+            gt_pose = targets[0]["poses"][0][0]
+            #plt.imshow(images.tensor[0][0].cpu(), cmap='gray')
+            #plt.scatter(output_pose[0].cpu() * 640, output_pose[1].cpu() * 640, s=0.5, c='g')
+            #plt.scatter(gt_pose[0].cpu()*640, gt_pose[1].cpu()*640, s=0.5,  c='r')
+            #plt.savefig('/home/asravan2/generate_synthetic_videos/generate_videos_2D/Mask2Former/test_images/' + str(t1) + '.png')
+            #plt.close()
             for k in list(losses.keys()):
                 if k in self.criterion.weight_dict:
                     losses[k] *= self.criterion.weight_dict[k]
                 else:
                     # remove this loss if not specified in `weight_dict`
                     losses.pop(k)
+                if "pose_" in k:
+                    losses.pop(k)
             return losses
         else:
             mask_cls_results = outputs["pred_logits"]
             mask_pred_results = outputs["pred_masks"]
-
+            
             mask_cls_result = mask_cls_results[0]
+            
+            pose_pred_results = outputs["pred_poses"]
+
             # upsample masks
             mask_pred_result = retry_if_cuda_oom(F.interpolate)(
                 mask_pred_results[0],
@@ -216,6 +230,8 @@ class VideoMaskFormer(nn.Module):
                 align_corners=False,
             )
 
+            #NOTE The following assumes that the batch-size is always 1
+            pose_pred_results = pose_pred_results[0]
             del outputs
 
             input_per_image = batched_inputs[0]
@@ -223,8 +239,7 @@ class VideoMaskFormer(nn.Module):
 
             height = input_per_image.get("height", image_size[0])  # raw image size before data augmentation
             width = input_per_image.get("width", image_size[1])
-
-            return retry_if_cuda_oom(self.inference_video)(mask_cls_result, mask_pred_result, image_size, height, width)
+            return retry_if_cuda_oom(self.inference_video)(mask_cls_result, mask_pred_result, pose_pred_results, image_size, height, width)
 
     def prepare_targets(self, targets, images):
         h_pad, w_pad = images.tensor.shape[-2:]
@@ -256,13 +271,13 @@ class VideoMaskFormer(nn.Module):
             gt_masks_per_video = gt_masks_per_video[valid_idx].float()          # N, num_frames, H, W
             gt_poses_per_video = gt_poses_per_video[valid_idx].float()
             gt_instances[-1].update({"masks": gt_masks_per_video, "poses": gt_poses_per_video})
-            
         return gt_instances
 
-    def inference_video(self, pred_cls, pred_masks, img_size, output_height, output_width):
+    def inference_video(self, pred_cls, pred_masks, pred_poses, img_size, output_height, output_width):
         if len(pred_cls) > 0:
             scores = F.softmax(pred_cls, dim=-1)[:, :-1]
             labels = torch.arange(self.sem_seg_head.num_classes, device=self.device).unsqueeze(0).repeat(self.num_queries, 1).flatten(0, 1)
+            
             # keep top-10 predictions
             scores_per_image, topk_indices = scores.flatten(0, 1).topk(10, sorted=False)
             labels_per_image = labels[topk_indices]
@@ -273,22 +288,25 @@ class VideoMaskFormer(nn.Module):
             pred_masks = F.interpolate(
                 pred_masks, size=(output_height, output_width), mode="bilinear", align_corners=False
             )
+            
+            pred_poses = pred_poses[topk_indices]
 
             masks = pred_masks > 0.
-
             out_scores = scores_per_image.tolist()
             out_labels = labels_per_image.tolist()
             out_masks = [m for m in masks.cpu()]
+            out_poses = [m for m in pred_poses.cpu()]
         else:
             out_scores = []
             out_labels = []
             out_masks = []
+            out_poses = []
 
         video_output = {
             "image_size": (output_height, output_width),
             "pred_scores": out_scores,
             "pred_labels": out_labels,
             "pred_masks": out_masks,
+            "pred_poses": out_poses,
         }
-
         return video_output

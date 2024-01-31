@@ -5,6 +5,7 @@ MaskFormer criterion.
 """
 import logging
 
+import pdb
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -82,12 +83,12 @@ def pose_mse_loss(
     Returns:
         Loss tensor
     """
-    loss = F.mse_loss(inputs, targets, reduction='mean')
+    loss = F.mse_loss(inputs*640, targets*640, reduction='mean')
     return loss 
 
-pose_mse_loss_jit = torch.jit.script(
-    pose_mse_loss
-)
+#pose_mse_loss_jit = torch.jit.script(
+#    pose_mse_loss
+#)
 
 def calculate_uncertainty(logits):
     """
@@ -215,7 +216,7 @@ class VideoSetCriterion(nn.Module):
         src_poses = src_poses[src_idx]
         target_poses = torch.cat([t['poses'][i] for t, (_, i) in zip(targets, indices)]).to(src_poses)
         losses = {
-                "loss_pose": pose_mse_loss_jit(src_poses, target_poses, num_masks),
+                "loss_pose": pose_mse_loss(src_poses, target_poses, num_masks),
         }
         return losses
 
@@ -275,7 +276,7 @@ class VideoSetCriterion(nn.Module):
                     l_dict = {k + f"_{i}": v for k, v in l_dict.items()}
                     losses.update(l_dict)
 
-        return losses
+        return losses, indices
 
     def __repr__(self):
         head = "Criterion " + self.__class__.__name__
