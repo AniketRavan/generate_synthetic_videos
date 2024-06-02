@@ -2,7 +2,7 @@
 import logging
 import math
 from typing import Tuple
-
+from torchvision.utils import save_image
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -86,7 +86,7 @@ class VideoMaskFormer(nn.Module):
         self.sem_seg_postprocess_before_inference = sem_seg_postprocess_before_inference
         self.register_buffer("pixel_mean", torch.Tensor(pixel_mean).view(-1, 1, 1), False)
         self.register_buffer("pixel_std", torch.Tensor(pixel_std).view(-1, 1, 1), False)
-
+        self.num_keypoints = 12
         self.num_frames = num_frames
 
     @classmethod
@@ -121,7 +121,7 @@ class VideoMaskFormer(nn.Module):
                 aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
             weight_dict.update(aux_weight_dict)
 
-        losses = ["labels", "masks", "poses"]
+        losses = ["labels", "masks"] # NOTE:poses was removed
 
         criterion = VideoSetCriterion(
             sem_seg_head.num_classes,
@@ -193,33 +193,31 @@ class VideoMaskFormer(nn.Module):
         if self.training:
             # mask classification target
             targets = self.prepare_targets(batched_inputs, images)
-            
-
             # bipartite matching-based loss
             losses, indices = self.criterion(outputs, targets)
-            t1 = time.time()
-            output_pose = outputs["pred_poses"][0][indices[0]][0].detach()
+            #t1 = time.time()
+            output_pose = outputs["pred_poses"][0][indices[0][0]].detach()
             gt_pose = targets[0]["poses"][0][0]
             #plt.imshow(images.tensor[0][0].cpu(), cmap='gray')
-            #plt.scatter(output_pose[0].cpu() * 640, output_pose[1].cpu() * 640, s=0.5, c='g')
+            #plt.scatter(output_pose[0][0][0].cpu() * 640, output_pose[0][0][1].cpu() * 640, s=1, c='g')
             #plt.scatter(gt_pose[0].cpu()*640, gt_pose[1].cpu()*640, s=0.5,  c='r')
-            #plt.savefig('/home/asravan2/generate_synthetic_videos/generate_videos_2D/Mask2Former/test_images/' + str(t1) + '.png')
+            #plt.savefig('/home/asravan2/generate_synthetic_videos/generate_videos_2D/Mask2Former/test_images/' + str('jhinuk') + '.png')
             #plt.close()
+            #save_image(outputs["pred_masks"][0,:,:1].sigmoid(),  "op.png", pad_value=1)
             for k in list(losses.keys()):
                 if k in self.criterion.weight_dict:
                     losses[k] *= self.criterion.weight_dict[k]
                 else:
                     # remove this loss if not specified in `weight_dict`
                     losses.pop(k)
-                if "pose_" in k:
-                    losses.pop(k)
+               # if "pose" in k:
+                #    losses.pop(k)
+            #pdb.set_trace() 
             return losses
         else:
             mask_cls_results = outputs["pred_logits"]
             mask_pred_results = outputs["pred_masks"]
-            
             mask_cls_result = mask_cls_results[0]
-            
             pose_pred_results = outputs["pred_poses"]
 
             # upsample masks
@@ -247,7 +245,8 @@ class VideoMaskFormer(nn.Module):
         for targets_per_video in targets:
             _num_instance = len(targets_per_video["instances"][0])
             mask_shape = [_num_instance, self.num_frames, h_pad, w_pad]
-            pose_shape = [_num_instance, self.num_frames, 2, 12]
+            pose_shape = [_num_instance, self.num_frames, 2, self.num_keypoints]
+            #pose_shape = [_num_instance, self.num_frames, 2, 12]
             gt_masks_per_video = torch.zeros(mask_shape, dtype=torch.bool, device=self.device)
             gt_poses_per_video = torch.zeros(pose_shape, dtype=torch.float, device=self.device)
 
@@ -258,8 +257,8 @@ class VideoMaskFormer(nn.Module):
 
                 gt_ids_per_video.append(targets_per_frame.gt_ids[:, None])
                 gt_masks_per_video[:, f_i, :h, :w] = targets_per_frame.gt_masks.tensor
-                gt_poses_per_video[:, f_i, :, :] = targets_per_frame.gt_poses
-
+                gt_poses_per_video[:, f_i, :, :] = targets_per_frame.gt_poses[..., :self.num_keypoints]
+                #gt_poses_per_video[:, f_i, :, :] = targets_per_frame.gt_poses
             gt_ids_per_video = torch.cat(gt_ids_per_video, dim=1)
             valid_idx = (gt_ids_per_video != -1).any(dim=-1)
 
@@ -290,7 +289,6 @@ class VideoMaskFormer(nn.Module):
             )
             
             pred_poses = pred_poses[topk_indices]
-
             masks = pred_masks > 0.
             out_scores = scores_per_image.tolist()
             out_labels = labels_per_image.tolist()

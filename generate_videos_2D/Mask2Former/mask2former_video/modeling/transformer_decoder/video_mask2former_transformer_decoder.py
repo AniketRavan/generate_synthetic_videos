@@ -211,13 +211,42 @@ class MLP_pose(nn.Module):
 
     def __init__(self, input_dim,  output_dim):
         super().__init__()
-        
-        self.layers = nn.ModuleList([nn.Linear(input_dim, input_dim//8), nn.Linear(input_dim//8, input_dim//64), nn.Linear(input_dim//64, output_dim)])
+        #self.dummy_layer=nn.Linear(input_dim, output_dim)
+        #nn.init.normal_(self.dummy_layer.weight, mean=4, std=2)
+        self.layers = nn.ModuleList([nn.Linear(input_dim, input_dim//4), nn.Linear(input_dim//4, input_dim//16), nn.Linear(input_dim//16, input_dim//64), nn.Linear(input_dim//64, input_dim//256), nn.Linear(input_dim//256, output_dim)])
         self.num_layers = len(self.layers)
+        self.bn=nn.ModuleList([nn.BatchNorm1d(input_dim // (4 ** (i+1))) for i in range(self.num_layers)])
+        
+        #################
+        # Convolutional layer
+        self.conv = nn.ModuleList([nn.Conv2d(1, 2, kernel_size=3), nn.Conv2d(2, 4, kernel_size=3, stride=2), nn.Conv2d(4, 8, kernel_size=3, stride=2), nn.Conv2d(8, 16, kernel_size=3), nn.Conv2d(16, 32, kernel_size=3)]).cuda()
+        self.bn_conv = nn.ModuleList([nn.BatchNorm2d((2)**(i+1)) for i in range(len(self.conv))])
+        #################
+        #for layer in self.layers:
+        #    nn.init.xavier_normal_(layer.weight, gain=1)
+        self.num_layers = len(self.layers)
+        self.leaky_relu = nn.LeakyReLU(negative_slope=0.01, inplace=True)
+        #linear_layer_input = 20736
+        linear_layer_input = 36992
+        self.linear_layers = nn.ModuleList([nn.Linear(linear_layer_input, linear_layer_input//16), nn.Linear(linear_layer_input//16, linear_layer_input//64), nn.Linear(linear_layer_input//64, linear_layer_input//256), nn.Linear(linear_layer_input//256, output_dim)])
 
     def forward(self, x):
-        for i, layer in enumerate(self.layers):
-            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+        check = True
+        if x.dim() == 4:
+            b, q, t, hw = x.shape
+        #    x = x.flatten(0,-1)
+        #    check = False
+        #x=self.dummy_layer(x)       
+        x = x.flatten(-3).reshape(b*q*t, 1, 160, 160)
+        for conv_layer, bn_layer in zip(self.conv, self.bn_conv):
+            x = bn_layer(self.leaky_relu(conv_layer(x)))
+        x = x.reshape(b, q, t, -1)
+        #for i, layer in enumerate(self.layers):
+        #    x = self.bn[i](self.leaky_relu(layer(x.float()))) if i < self.num_layers - 1 else layer(x)     
+        for linear_layer in self.linear_layers:
+            x = self.leaky_relu(linear_layer(x))
+        #if check == False:
+        #    x = x.reshape(b, q, t, x.shape[-1])
         return x.sigmoid()
 
 @TRANSFORMER_DECODER_REGISTRY.register()
@@ -352,8 +381,9 @@ class VideoMultiScaleMaskedTransformerDecoder(nn.Module):
         if self.mask_classification:
             self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
         self.mask_embed = MLP(hidden_dim, hidden_dim, mask_dim, 3)
-        self.pose_embed = MLP_pose(9216, 24) # 96*96
-        self.resize = T.Resize([96,96])
+        self.num_key_points = 12
+        self.pose_embed = MLP_pose(160*160, self.num_key_points*2) # 96*96
+        self.resize = T.Resize([160,160])
 
     @classmethod
     def from_config(cls, cfg, in_channels, mask_classification):
@@ -470,10 +500,11 @@ class VideoMultiScaleMaskedTransformerDecoder(nn.Module):
         outputs_mask = torch.einsum("bqc,btchw->bqthw", mask_embed, mask_features)
         b, q, t, _, _ = outputs_mask.shape
         resize_mask = self.resize(outputs_mask.flatten(0,2))
-        outputs_pose = self.pose_embed(resize_mask.flatten(-2))
-        outputs_pose = outputs_pose.reshape(b,q,t, -1)
-        outputs_pose = outputs_pose.reshape(b,q,t,2,12)
-
+        _, h, w = resize_mask.shape
+        outputs_pose = self.pose_embed(resize_mask.clone().reshape(b,q,t,h,w).flatten(-2))
+        #outputs_pose = outputs_pose.reshape(b,q,t, -1)
+        outputs_pose = outputs_pose.reshape(b,q,t,2,self.num_key_points)
+    
 
         # NOTE: prediction is of higher-resolution
         # [B, Q, T, H, W] -> [B, Q, T*H*W] -> [B, h, Q, T*H*W] -> [B*h, Q, T*HW]

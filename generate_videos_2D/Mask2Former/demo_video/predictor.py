@@ -7,6 +7,8 @@ from collections import deque
 import cv2
 import torch
 
+import matplotlib.pyplot as plt
+
 from visualizer import TrackVisualizer
 
 from detectron2.data import MetadataCatalog
@@ -35,11 +37,11 @@ class VisualizationDemo(object):
         self.instance_mode = instance_mode
 
         self.parallel = parallel
-        #if parallel:
-        #    num_gpu = torch.cuda.device_count()
-        #    self.predictor = AsyncPredictor(cfg, num_gpus=num_gpu)
-        #else:
-        #    self.predictor = VideoPredictor(cfg)
+        if parallel:
+            num_gpu = torch.cuda.device_count()
+            self.predictor = AsyncPredictor(cfg, num_gpus=num_gpu)
+        else:
+            self.predictor = VideoPredictor(cfg)
 
     def run_on_video(self, frames, confidence_thresh=0.85):
         """
@@ -50,49 +52,70 @@ class VisualizationDemo(object):
             predictions (dict): the output of the model.
             vis_output (VisImage): the visualized image output.
         """
+        num_frames = 2
         vis_output = None
-        #predictions = self.predictor(frames)
-        predictions = json.load(open('../output_lr_001/inference/results.json'))
-        #image_size = predictions["image_size"]
-        #pred_scores = predictions["pred_scores"]
-        #pred_labels = predictions["pred_labels"]
-        #pred_masks = predictions["pred_masks"]
+        predictions = self.predictor(frames[0:num_frames])
+        image_size = predictions["image_size"]
+        pred_scores = predictions["pred_scores"]
+        pred_labels = predictions["pred_labels"]
+        pred_masks = predictions["pred_masks"]
+        frame_masks = list(zip(*pred_masks))
+        pred_poses = predictions["pred_poses"]
+        frame_poses = list(zip(*pred_poses))
+        ###
         image_size = frames[0].shape
-        #frame_masks = list(zip(*pred_masks))
+        ###
+        
+        
         total_vis_output = []
-        for frame_idx in range(4):
-        #for frame_idx in range(len(frames)):
+        for frame_idx in range(num_frames):
             frame = frames[frame_idx][:, :, ::-1]
             visualizer = TrackVisualizer(frame, self.metadata, instance_mode=self.instance_mode)
             ins = Instances(image_size)
             if len(predictions) > 0:
-            #if len(pred_scores) > 0:
-                ins.scores = []
-                ins.pred_classes = []
-                ins.pred_masks = []
-                ins.pred_keypoints = []
+                filtered_pred_score = []
+                filtered_pred_masks = []
+                filtered_pred_keypoints = []
+                filtered_pred_classes = []
+
+                #ins.scores = []
+                #ins.pred_classes = []
+                #ins.pred_masks = []
+                #ins.pred_keypoints = []
                 #for pred_score, pred_class, pred_mask in zip(pred_scores, pred_labels, frame_masks[frame_idx]):
-                for prediction in predictions:
-                    if (prediction['score'] > 0.0):
-                        ins.scores.append(prediction['score'])
-                        ins.pred_classes.append(prediction['category_id'] - 1)
-                        decoded_mask = cocomask.decode(prediction['segmentations'][frame_idx])
-                        decoded_mask = torch.tensor(decoded_mask)
-                        ins.pred_masks.append(decoded_mask)
-                        coco_keypoints = torch.tensor(prediction['poses'][frame_idx]).permute(1,0)
-                        coco_keypoints = torch.cat((640*coco_keypoints, torch.ones(coco_keypoints.shape[0], 1)), axis=1)
-                        ins.pred_keypoints.append(coco_keypoints)
-                    #if (pred_score > confidence_thresh):
-                        #ins.scores.append(pred_score)
-                        #ins.pred_classes.append(pred_class)
-                        #ins.pred_masks.append(pred_mask)
+                for pred_score, pred_class, pred_mask, pred_pose in zip(pred_scores, pred_labels, pred_masks, pred_poses):
+                #for prediction in predictions:
+                    #if (prediction['score'] > 0.95):
+                    #    ins.scores.append(prediction['score'])
+                    #    ins.pred_classes.append(prediction['category_id'] - 1)
+                    #    decoded_mask = cocomask.decode(prediction['segmentations'][frame_idx])
+                    #    decoded_mask = torch.tensor(decoded_mask)
+                    #    ins.pred_masks.append(decoded_mask)
+                    #    coco_keypoints = torch.tensor(prediction['poses'][frame_idx]).permute(1,0)
+                    #    coco_keypoints = torch.cat((640*coco_keypoints, torch.ones(coco_keypoints.shape[0], 1)), axis=1)
+                    #    ins.pred_keypoints.append(coco_keypoints)
+                    if (pred_score > confidence_thresh):
+                    #    ins.scores.append(pred_score)
+                    #    ins.pred_classes.append(pred_class)
+                    #    ins.pred_masks.append(pred_mask)
+                    #    ins.pred_keypoints.append(pred_pose)
+                        plt.imshow(pred_mask[frame_idx], cmap='gray')
+                        plt.savefig(f'test_outputs/mask_{frame_idx}.png')
+                        plt.close()
+                        plt.imshow(frame, cmap='gray')
+                        plt.savefig(f'test_outputs/grayscale_{frame_idx}.png')
+                        plt.close()
                     #ins.scores = pred_scores
                     #ins.pred_classes = pred_labels
                     #ins.pred_masks = torch.stack(frame_mass[frame_idx], dim=0)
-            if (ins.pred_keypoints):
-                vis_output = visualizer.draw_and_connect_keypoints(ins.pred_keypoints[0])
-            #vis_output = visualizer.overlay_instances(labels=ins.pred_classes,  keypoints=ins.pred_keypoints, alpha=0.75)
-            #vis_output = visualizer.draw_instance_predictions(predictions=ins)
+            #if (ins.pred_keypoints):
+            #    vis_output = visualizer.draw_and_connect_keypoints(ins.pred_keypoints[0])
+            #vis_output = visualizer.overlay_instances(labels=ins.pred_classes, alpha=0.75)
+            ins.scores = pred_scores
+            ins.pred_masks = torch.stack(frame_masks[frame_idx], dim=0)
+            ins.pred_keypoints = torch.stack(frame_poses[frame_idx], dim=0)
+            ins.pred_classes = pred_labels
+            vis_output = visualizer.draw_instance_predictions(predictions=ins)
             total_vis_output.append(vis_output)
         return predictions, total_vis_output
 
@@ -160,6 +183,7 @@ class AsyncPredictor:
             super().__init__()
 
         def run(self):
+            
             predictor = VideoPredictor(self.cfg)
 
             while True:

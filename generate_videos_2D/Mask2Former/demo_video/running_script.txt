@@ -1,1 +1,1 @@
-python demo.py --config-file ../test_output/config.yaml --input ../datasets/danio2d_small/val/images/001/ --save-frames True --output visualization_output --opts MODEL.WEIGHTS ../test_output/model_final.pth 
+python demo.py --config-file ../output_3_train_1_fish_low_class_loss/config.yaml --input ../datasets/danio2d_small/val/images/000001/ --save-frames True --output visualization_output --opts MODEL.WEIGHTS ../output_3_train_1_fish/model_final.pth

@@ -278,6 +278,13 @@ def main(args):
 
     trainer = Trainer(cfg)
     #trainer.resume_or_load(resume=args.resume)
+    #abc=torch.load(cfg.MODEL.WEIGHTS)
+    #trainer.model.load_state_dict(abc["model"], strict=False)
+
+    #for p in trainer.model.parameters():
+    #    p.requires_grad==False
+    #for p in trainer.model.sem_seg_head.predictor.pose_embed.parameters():
+    #    p.requires_grad==True
     return trainer.train()
 
 

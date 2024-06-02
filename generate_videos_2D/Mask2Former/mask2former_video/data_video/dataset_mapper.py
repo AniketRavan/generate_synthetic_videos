@@ -90,7 +90,6 @@ def ytvis_annotations_to_instances(annos, image_size):
     classes = [int(obj["category_id"]) for obj in annos]
     classes = torch.tensor(classes, dtype=torch.int64)
     target.gt_classes = classes
-    
     poses = [obj["poses"] for obj in annos]
     poses = torch.tensor(poses, dtype=torch.float)
     target.gt_poses = poses
@@ -205,6 +204,7 @@ class YTVISDatasetMapper:
             selected_idx = sorted(selected_idx)
             if self.sampling_frame_shuffle:
                 random.shuffle(selected_idx)
+            #selected_idx=[0,1]
         else:
             selected_idx = range(4)#video_length)
         

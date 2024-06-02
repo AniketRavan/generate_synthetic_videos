@@ -79,7 +79,7 @@ def batch_pose_mse_loss(inputs: torch.Tensor, targets: torch.Tensor):
     # mse_loss = F.mse_loss(inputs, targets, reduction='mean')
     reshaped_inputs = inputs.flatten(1).unsqueeze(1).permute(2,0,1)
     reshaped_targets = targets.unsqueeze(0).flatten(2).permute(2,0,1)#.expand_as(reshaped_inputs)
-    mse_loss = F.mse_loss(reshaped_inputs, reshaped_targets, reduction="none").mean(0)
+    mse_loss = 20 * F.mse_loss(reshaped_inputs , reshaped_targets , reduction="none").mean(0)
     return mse_loss
 
 #batch_pose_mse_loss_jit = torch.jit.script(
@@ -134,7 +134,6 @@ class VideoHungarianMatcher(nn.Module):
             out_mask = outputs["pred_masks"][b]  # [num_queries, T, H_pred, W_pred]
             # gt masks are already padded when preparing target
             tgt_mask = targets[b]["masks"].to(out_mask)  # [num_gts, T, H_pred, W_pred]
-            
             out_pose = outputs["pred_poses"][b]
             tgt_pose = targets[b]["poses"].to(out_pose)
 

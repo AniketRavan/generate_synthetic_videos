@@ -3,6 +3,7 @@
 import torch
 import numpy as np
 import matplotlib.colors as mplc
+import pdb
 
 from detectron2.utils.visualizer import ColorMode, GenericMask, Visualizer, _create_text_labels
 
@@ -44,6 +45,7 @@ class TrackVisualizer(Visualizer):
         Returns:
             output (VisImage): image object with visualizations.
         """
+
         preds = predictions.to(self.cpu_device)
 
         boxes = preds.pred_boxes if preds.has("pred_boxes") else None
@@ -52,7 +54,6 @@ class TrackVisualizer(Visualizer):
         labels = _create_text_labels(classes, scores, self.metadata.get("thing_classes", None))
         if labels is not None:
             labels = ["[{}] ".format(_id) + l for _id, l in enumerate(labels)]
-
         if preds.has("pred_masks"):
             masks = np.asarray(preds.pred_masks)
             masks = [GenericMask(x, self.output.height, self.output.width) for x in masks]

@@ -9,7 +9,7 @@ import pdb
 import torch
 import torch.nn.functional as F
 from torch import nn
-
+from torchvision.utils import save_image
 from detectron2.utils.comm import get_world_size
 from detectron2.projects.point_rend.point_features import (
     get_uncertain_point_coords_with_randomness,
@@ -83,7 +83,7 @@ def pose_mse_loss(
     Returns:
         Loss tensor
     """
-    loss = F.mse_loss(inputs*640, targets*640, reduction='mean')
+    #loss =  20 * F.mse_loss(inputs, targets, reduction='mean')
     return loss 
 
 #pose_mse_loss_jit = torch.jit.script(
@@ -210,7 +210,6 @@ class VideoSetCriterion(nn.Module):
         """Compute mean square error (mse) loss for pose.
         target dicts yet to be defined. Tensor size of dim [nb_target_boxes, 2, 12)
         """
-        
         src_idx = self._get_src_permutation_idx(indices)
         src_poses = outputs["pred_poses"]
         src_poses = src_poses[src_idx]
@@ -218,6 +217,11 @@ class VideoSetCriterion(nn.Module):
         losses = {
                 "loss_pose": pose_mse_loss(src_poses, target_poses, num_masks),
         }
+        #print("t1, x: ", src_poses[0,0,0].detach().cpu().numpy(), target_poses[0,0,0].detach().cpu().numpy())
+        #print("t1, y: ", src_poses[0,0,1].detach().cpu().numpy(), target_poses[0,0,1].detach().cpu().numpy())
+        #print("t2, x: ", src_poses[0,1,0].detach().cpu().numpy(), target_poses[0,1,0].detach().cpu().numpy())
+        #print("t2, y: ", src_poses[0,1,1].detach().cpu().numpy(), target_poses[0,1,1].detach().cpu().numpy())
+        #print("loss:", losses["loss_pose"].item())
         return losses
 
     def _get_src_permutation_idx(self, indices):
@@ -252,7 +256,6 @@ class VideoSetCriterion(nn.Module):
 
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
-
         # Compute the average number of target boxes accross all nodes, for normalization purposes
         num_masks = sum(len(t["labels"]) for t in targets)
         num_masks = torch.as_tensor(
